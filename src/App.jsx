@@ -1,35 +1,36 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from "react";
+import ParkingDashboard from "./pages/ParkingDashboard";
+import AdminLogin from "./pages/AdminLogin";
+import { clearSession, createSession, getSession } from "./utils/auth";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [session, setSession] = useState(() => {
+    try {
+      return getSession();
+    } catch {
+      return null;
+    }
+  });
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+  function handleLoginSuccess() {
+    try {
+      const nextSession = createSession();
+      setSession(nextSession);
+    } catch {
+      setSession({ token: "fallback" });
+    }
+  }
+
+  function handleLogout() {
+    clearSession();
+    setSession(null);
+  }
+
+  if (!session) {
+    return <AdminLogin onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  return <ParkingDashboard onLogout={handleLogout} />;
 }
 
-export default App
+export default App;
