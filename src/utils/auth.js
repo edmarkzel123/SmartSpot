@@ -7,8 +7,13 @@ const SESSION_DURATION_MS = 30 * 60 * 1000;
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MS = 60 * 1000;
 
-const ADMIN_USERNAME = "admin@smartspot.local";
-const ADMIN_PASSWORD_HASH = "f7a4046dcdab6f402cde99c60706ffbba69dfcb57f53f76d2bde60b03f21ce38";
+const ADMIN_ACCOUNTS = [
+  {
+    username: "admin@smartspot.local",
+    passwordHash: "f7a4046dcdab6f402cde99c60706ffbba69dfcb57f53f76d2bde60b03f21ce38",
+    role: "Super Admin"
+  }
+];
 
 function safeJsonParse(value, fallback) {
   try {
@@ -106,9 +111,11 @@ export async function verifyAdminCredentials(username, password) {
   const normalizedUsername = username.trim().toLowerCase();
   const passwordHash = await sha256(password);
 
-  const isValid =
-    normalizedUsername === ADMIN_USERNAME &&
-    passwordHash === ADMIN_PASSWORD_HASH;
+  const account = ADMIN_ACCOUNTS.find(
+    (item) => item.username.toLowerCase() === normalizedUsername
+  );
+
+  const isValid = Boolean(account) && passwordHash === account.passwordHash;
 
   if (!isValid) {
     registerFailedAttempt();
@@ -159,7 +166,12 @@ export function clearSession() {
 }
 
 export const adminDemoAccess = {
-  username: ADMIN_USERNAME,
+  username: ADMIN_ACCOUNTS[0].username,
   passwordHint: "Enter your secure admin password",
   demoPassword: "SmartSpot@2026"
 };
+
+export const adminAccounts = ADMIN_ACCOUNTS.map((item) => ({
+  username: item.username,
+  role: item.role
+}));

@@ -11,6 +11,11 @@ const parkingData = {
   avgTurnoverMinutes: 96,
   predictedPeakOccupancy: "88% at 5:30 PM",
   lastUpdated: "February 20, 2026, 10:30 AM",
+  supervisor: {
+    name: supervisorName,
+    role: "Parking Operations Supervisor",
+    shift: "Morning Shift"
+  }
 };
 
 const metrics = [
