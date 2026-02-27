@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import DashboardCard from "../components/DashboardCard";
+import StatusIndicator from "../components/StatusIndicator";
 import {
   parkingData,
   metrics,
@@ -11,6 +12,8 @@ import "../styles/dashboard.css";
 
 function ParkingDashboard({ onLogout }) {
   const [liveTime, setLiveTime] = useState(new Date());
+  // Controls whether detailed sensor health cards are shown.
+  const [showHealthDetails, setShowHealthDetails] = useState(false);
 
   useEffect(() => {
     const timerId = setInterval(() => {
@@ -31,6 +34,12 @@ function ParkingDashboard({ onLogout }) {
     const offline = sensorStatus.filter((sensor) => sensor.health === "Offline").length;
     return { online, warning, offline };
   }, []);
+
+  const overallHealth = useMemo(() => {
+    if (sensorSummary.offline > 0) return "critical";
+    if (sensorSummary.warning > 0) return "warning";
+    return "stable";
+  }, [sensorSummary]);
 
   return (
     <div className="dashboard-page">
@@ -82,6 +91,21 @@ function ParkingDashboard({ onLogout }) {
             <span>Warning: {sensorSummary.warning}</span>
             <span>Offline: {sensorSummary.offline}</span>
           </div>
+          <button
+            type="button"
+            className={`health-toggle ${showHealthDetails ? "active" : ""}`}
+            onClick={() => setShowHealthDetails((prev) => !prev)}
+          >
+            {showHealthDetails ? "Hide details" : "Show details"}
+          </button>
+          {showHealthDetails ? (
+            <div className="health-indicators">
+              <StatusIndicator label="Overall Status" value={overallHealth} tone={overallHealth} />
+              <StatusIndicator label="Online Sensors" value={sensorSummary.online} tone="stable" />
+              <StatusIndicator label="Sensors at Risk" value={sensorSummary.warning} tone="warning" />
+              <StatusIndicator label="Offline Sensors" value={sensorSummary.offline} tone="critical" />
+            </div>
+          ) : null}
           <ul>
             {sensorStatus.map((sensor) => (
               <li key={sensor.id} className="sensor-item">

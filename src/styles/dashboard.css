@@ -178,6 +178,72 @@ body {
   margin-bottom: 0.55rem;
 }
 
+.health-toggle {
+  border: 1px solid #b8ccdf;
+  border-radius: 10px;
+  background: #f0f8ff;
+  color: #0a4f65;
+  font-weight: 600;
+  padding: 0.42rem 0.8rem;
+  margin-bottom: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.health-toggle:hover {
+  background: #e2f2ff;
+}
+
+.health-toggle.active {
+  background: #0b5670;
+  color: #ffffff;
+  border-color: #0b5670;
+}
+
+.health-indicators {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.status-indicator {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem;
+  background: #f8fcff;
+}
+
+.status-indicator-label {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-indicator-value {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.status-indicator.stable {
+  border-color: #b9e8c6;
+  background: #effcf2;
+}
+
+.status-indicator.warning {
+  border-color: #f5d67b;
+  background: #fff9ea;
+}
+
+.status-indicator.critical {
+  border-color: #f3b0b0;
+  background: #fff0f0;
+}
+
 .sensor-section ul,
 .slot-status ul,
 .notification-section ul {
