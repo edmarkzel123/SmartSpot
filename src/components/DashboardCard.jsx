@@ -1,11 +1,11 @@
-function DashboardCard({ title, value, subtitle, status }) {
+import React from "react";
+
+function DashboardCard({ title, value }) {
   return (
-    <article className="dashboard-card">
+    <section className="card">
       <h3>{title}</h3>
-      <p className="card-value">{value}</p>
-      {subtitle ? <p className="card-subtitle">{subtitle}</p> : null}
-      {status ? <span className={`status-pill ${status.toLowerCase()}`}>{status}</span> : null}
-    </article>
+      <p>{value}</p>
+    </section>
   );
 }
 
