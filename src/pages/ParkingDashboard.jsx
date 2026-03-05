@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardCard from "../components/DashboardCard";
 import StatusIndicator from "../components/StatusIndicator";
 import {
@@ -6,20 +7,25 @@ import {
   metrics,
   slotStatus,
   sensorStatus,
-  notifications
+  notifications,
 } from "../data/parkingData";
 import "../styles/dashboard.css";
 
-function ParkingDashboard({ onLogout }) {
+function ParkingDashboard({ onLogout, settings }) {
+  const navigate = useNavigate();
   const [liveTime, setLiveTime] = useState(new Date());
-  // Controls whether detailed sensor health cards are shown.
   const [showHealthDetails, setShowHealthDetails] = useState(false);
+
+  // Notification dismissal state
+  const [dismissedIds, setDismissedIds] = useState([]);
+
+  // Active filter for slot status
+  const [slotFilter, setSlotFilter] = useState("All");
 
   useEffect(() => {
     const timerId = setInterval(() => {
       setLiveTime(new Date());
     }, 1000);
-
     return () => clearInterval(timerId);
   }, []);
 
@@ -29,9 +35,9 @@ function ParkingDashboard({ onLogout }) {
   );
 
   const sensorSummary = useMemo(() => {
-    const online = sensorStatus.filter((sensor) => sensor.health === "Online").length;
-    const warning = sensorStatus.filter((sensor) => sensor.health === "Warning").length;
-    const offline = sensorStatus.filter((sensor) => sensor.health === "Offline").length;
+    const online = sensorStatus.filter((s) => s.health === "Online").length;
+    const warning = sensorStatus.filter((s) => s.health === "Warning").length;
+    const offline = sensorStatus.filter((s) => s.health === "Offline").length;
     return { online, warning, offline };
   }, []);
 
@@ -40,6 +46,18 @@ function ParkingDashboard({ onLogout }) {
     if (sensorSummary.warning > 0) return "warning";
     return "stable";
   }, [sensorSummary]);
+
+  const activeNotifications = notifications.filter(
+    (n) => !dismissedIds.includes(n.id)
+  );
+
+  const filteredSlots = slotFilter === "All"
+    ? slotStatus
+    : slotStatus.filter((s) => s.status === slotFilter);
+
+  function handleDismiss(id) {
+    setDismissedIds((prev) => [...prev, id]);
+  }
 
   return (
     <div className="dashboard-page">
@@ -51,16 +69,28 @@ function ParkingDashboard({ onLogout }) {
             {parkingData.mallName} | {parkingData.locationName}
           </p>
         </div>
-
         <div className="header-actions">
           <p className="live-time">Live Time: {liveTime.toLocaleTimeString()}</p>
-          <button type="button" className="logout-button" onClick={onLogout}>
-            Logout
-          </button>
+          <p className="supervisor-badge">Supervisor: {settings?.supervisorName || "Jamie Cruz"}</p>
+          <div className="header-btns">
+            <button type="button" className="settings-button" onClick={() => navigate("/settings")}>
+              ⚙ Settings
+            </button>
+            <button type="button" className="logout-button" onClick={onLogout}>
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="dashboard-main">
+        {/* Occupancy Alert Banner — state-driven UI update */}
+        {occupancyRate >= (settings?.alertThreshold || 85) && (
+          <div className="alert-banner" role="alert">
+            ⚠ Occupancy alert: {occupancyRate}% exceeds the {settings?.alertThreshold || 85}% threshold!
+          </div>
+        )}
+
         <section className="metrics" aria-label="Parking Metrics">
           {metrics.map((metric) => (
             <DashboardCard
@@ -81,7 +111,7 @@ function ParkingDashboard({ onLogout }) {
             <p><strong>Levels covered:</strong> {parkingData.levelsCovered}</p>
             <p><strong>Predicted peak:</strong> {parkingData.predictedPeakOccupancy}</p>
           </div>
-          <p className="last-updated">System snapshot timestamp: {parkingData.lastUpdated}</p>
+          <p className="last-updated">System snapshot: {parkingData.lastUpdated}</p>
         </section>
 
         <section className="sensor-section" aria-label="Sensor Status">
@@ -98,14 +128,16 @@ function ParkingDashboard({ onLogout }) {
           >
             {showHealthDetails ? "Hide details" : "Show details"}
           </button>
-          {showHealthDetails ? (
+
+          {showHealthDetails && (
             <div className="health-indicators">
               <StatusIndicator label="Overall Status" value={overallHealth} tone={overallHealth} />
               <StatusIndicator label="Online Sensors" value={sensorSummary.online} tone="stable" />
               <StatusIndicator label="Sensors at Risk" value={sensorSummary.warning} tone="warning" />
               <StatusIndicator label="Offline Sensors" value={sensorSummary.offline} tone="critical" />
             </div>
-          ) : null}
+          )}
+
           <ul>
             {sensorStatus.map((sensor) => (
               <li key={sensor.id} className="sensor-item">
@@ -124,8 +156,21 @@ function ParkingDashboard({ onLogout }) {
 
         <section className="slot-status" aria-label="Slot Monitoring">
           <h2>Live Slot Availability</h2>
+          {/* Filter controls — state-driven UI update */}
+          <div className="slot-filter">
+            {["All", "Available", "Occupied"].map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`filter-btn ${slotFilter === f ? "active" : ""}`}
+                onClick={() => setSlotFilter(f)}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
           <ul>
-            {slotStatus.map((slot) => (
+            {filteredSlots.map((slot) => (
               <li key={slot.slotId} className="slot-item">
                 <span>
                   {slot.slotId} ({slot.level}) | Plate: {slot.plateNumber}
@@ -138,16 +183,26 @@ function ParkingDashboard({ onLogout }) {
 
         <section className="notification-section" aria-label="System Notifications">
           <h2>Incident and Alert Feed</h2>
-          <ul>
-            {notifications.map((item) => (
-              <li key={item.id} className={`notification-item ${item.type}`}>
-                {item.message}
-              </li>
-            ))}
-          </ul>
+          {activeNotifications.length === 0 ? (
+            <p className="no-alerts">All clear — no active alerts.</p>
+          ) : (
+            <ul>
+              {activeNotifications.map((item) => (
+                <li key={item.id} className={`notification-item ${item.type}`}>
+                  <span>{item.message}</span>
+                  <button
+                    type="button"
+                    className="dismiss-btn"
+                    onClick={() => handleDismiss(item.id)}
+                    aria-label="Dismiss notification"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
-
-        
       </main>
 
       <footer className="dashboard-footer">

@@ -64,9 +64,35 @@ body {
   text-align: right;
 }
 
+.supervisor-badge {
+  font-size: 0.82rem;
+  opacity: 0.9;
+  margin: 0.2rem 0 0.5rem;
+}
+
 .live-time {
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.3rem;
   font-size: 0.9rem;
+}
+
+.header-btns {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.settings-button {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  padding: 0.45rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-button:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .logout-button {
@@ -81,6 +107,18 @@ body {
 
 .logout-button:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Alert banner */
+.alert-banner {
+  grid-column: 1 / -1;
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border: 1px solid #f5d67b;
+  border-radius: 12px;
+  padding: 0.8rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .dashboard-main {
@@ -307,6 +345,35 @@ body {
   background: var(--err-bg);
 }
 
+/* Slot filter buttons */
+.slot-filter {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.filter-btn {
+  border: 1px solid #b8ccdf;
+  border-radius: 999px;
+  background: #f0f8ff;
+  color: #0a4f65;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.filter-btn:hover {
+  background: #e2f2ff;
+}
+
+.filter-btn.active {
+  background: #0b5670;
+  color: #ffffff;
+  border-color: #0b5670;
+}
+
 .slot-status {
   grid-column: 1 / 7;
 }
@@ -315,12 +382,17 @@ body {
   grid-column: 7 / -1;
 }
 
+/* Notification dismiss */
 .notification-item {
   padding: 0.6rem 0.7rem;
   border-radius: 10px;
   margin-bottom: 0.55rem;
   border: 1px solid var(--line);
   background: #f8fcff;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .notification-item.warning {
@@ -331,6 +403,28 @@ body {
 .notification-item.critical {
   border-color: #f3b0b0;
   background: #fff0f0;
+}
+
+.dismiss-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  line-height: 1;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.dismiss-btn:hover {
+  background: rgba(0,0,0,0.07);
+}
+
+.no-alerts {
+  color: var(--ok-text);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .supervisor-section {
@@ -353,11 +447,9 @@ body {
   .dashboard-header {
     flex-direction: column;
   }
-
   .header-actions {
     text-align: left;
   }
-
   .summary-section,
   .sensor-section,
   .slot-status,
