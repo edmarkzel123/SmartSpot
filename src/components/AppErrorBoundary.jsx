@@ -15,7 +15,7 @@ class AppErrorBoundary extends Component {
 
   componentDidCatch(error) {
     // Keep console trace for debugging in browser devtools.
-    console.error("SmartSpot runtime error:", error);
+
   }
 
   handleReload = () => {

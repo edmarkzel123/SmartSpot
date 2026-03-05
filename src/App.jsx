@@ -12,7 +12,7 @@ function App() {
 
   // Global app settings state — shared across pages
   const [settings, setSettings] = useState({
-    supervisorName: "Jamie Cruz",
+    supervisorName: "Edmarkzel",
     alertThreshold: 85,
     refreshInterval: 30,
     notificationsEnabled: true,
