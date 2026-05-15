@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+.expo
+SmartSpotMobile/node_modules
+SmartSpot-backend/.venv
+SmartSpot-backend/src
+SmartSpot-backend/**/__pycache__
+SmartSpot-backend/**/*.pyc

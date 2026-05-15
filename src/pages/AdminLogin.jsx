@@ -38,13 +38,17 @@ function AdminLogin({ onLoginSuccess }) {
 
     setLoading(false);
 
+    
     if (!result.ok) {
       if (result.reason === "locked") {
         setError("Too many attempts. Account is temporarily locked.");
         setLockoutMs(getLockoutRemainingMs());
         return;
       }
-
+      if (result.reason === "network") {          // ← ADD THIS
+        setError("Cannot reach server. Is Django running?");
+        return;
+      }
       setError("Invalid admin credentials.");
       return;
     }

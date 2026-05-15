@@ -11,8 +11,7 @@
  *   Rounded pill inputs, stacked card layout, animated tab switcher.
  */
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -27,10 +26,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { loginWithApi, registerWithApi } from "../utils/auth";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "smartspot_accounts";
 
 const ADMIN_CREDS = {
   email: "admin@smartspot.local",
@@ -68,19 +66,6 @@ function validateEmail(email) {
 function validatePlate(plate) {
   if (!plate.trim()) return true; // optional
   return /^[A-Z0-9\- ]{3,10}$/i.test(plate.trim());
-}
-
-async function loadAccounts() {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-async function saveAccounts(accounts) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -167,7 +152,7 @@ function GhostButton({ label, onPress }) {
 // ─── Tab Indicator ────────────────────────────────────────────────────────────
 
 function TabSwitcher({ activeTab, onSwitch }) {
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [slideAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -176,7 +161,7 @@ function TabSwitcher({ activeTab, onSwitch }) {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [activeTab]);
+  }, [activeTab, slideAnim]);
 
   const indicatorLeft = slideAnim.interpolate({
     inputRange: [0, 1],
@@ -234,38 +219,24 @@ function LoginForm({ onLoginSuccess }) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Admin check
-    if (
-      normalizedEmail === ADMIN_CREDS.email &&
-      password === ADMIN_CREDS.password
-    ) {
-      setLoading(false);
-      onLoginSuccess("admin", {
-        fullName: "Parking Administrator",
-        plateNumber: "Admin Access",
-        email: ADMIN_CREDS.email,
-      });
-      return;
-    }
-
-    // Registered user check
-    const accounts = await loadAccounts();
-    const match = accounts.find(
-      (a) =>
-        a.email.toLowerCase() === normalizedEmail && a.password === password
-    );
-
+    const result = await loginWithApi(normalizedEmail, password);
     setLoading(false);
 
-    if (!match) {
+    if (!result.ok) {
+      if (result.reason === "network") {
+        setGlobalError("Cannot reach Django API. Check that the backend is running.");
+        return;
+      }
       setGlobalError("Incorrect email or password. Please try again.");
       return;
     }
 
-    onLoginSuccess("user", {
-      fullName: match.fullName,
-      plateNumber: match.plateNumber || "Not provided",
-      email: match.email,
+    const user = result.user || {};
+    const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    onLoginSuccess(user.is_staff ? "admin" : "user", {
+      fullName: fullName || user.username || "SmartSpot User",
+      plateNumber: user.is_staff ? "Admin Access" : "Not provided",
+      email: user.email || normalizedEmail,
     });
   }
 
@@ -368,39 +339,33 @@ function RegisterForm({ onLoginSuccess }) {
 
     await new Promise((r) => setTimeout(r, 700));
 
-    const accounts = await loadAccounts();
-    const exists = accounts.some(
-      (a) => a.email.toLowerCase() === form.email.trim().toLowerCase()
-    );
+    const email = form.email.trim().toLowerCase();
+    const registerResult = await registerWithApi({
+      username: email,
+      email,
+      password: form.password,
+      fullName: form.fullName.trim(),
+    });
 
-    if (exists) {
-      setErrors((prev) => ({
-        ...prev,
-        email: "An account with this email already exists.",
-      }));
+    if (!registerResult.ok) {
+      const message = registerResult.reason === "network"
+        ? "Cannot reach Django API. Check that the backend is running."
+        : registerResult.message || "Could not create this account.";
+      setErrors((prev) => ({ ...prev, email: message }));
       setLoading(false);
       return;
     }
 
-    const newAccount = {
-      id: Date.now().toString(),
-      fullName: form.fullName.trim(),
-      email: form.email.trim().toLowerCase(),
-      plateNumber: form.plateNumber.trim().toUpperCase() || "Not provided",
-      password: form.password,
-      createdAt: new Date().toISOString(),
-    };
-
-    await saveAccounts([...accounts, newAccount]);
+    await loginWithApi(email, form.password);
     setLoading(false);
     setSuccess(true);
 
     // Auto login after 1.2s
     setTimeout(() => {
       onLoginSuccess("user", {
-        fullName: newAccount.fullName,
-        plateNumber: newAccount.plateNumber,
-        email: newAccount.email,
+        fullName: form.fullName.trim(),
+        plateNumber: form.plateNumber.trim().toUpperCase() || "Not provided",
+        email,
       });
     }, 1200);
   }

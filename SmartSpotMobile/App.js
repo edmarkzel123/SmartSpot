@@ -6,6 +6,7 @@ import UserLoginScreen from "./src/screens/UserLoginScreen";
 import ParkingDashboardScreen from "./src/screens/ParkingDashboardScreen";
 import SettingsPageScreen from "./src/screens/SettingsPageScreen";
 import { palette } from "./src/theme/palette";
+import { clearTokens } from "./src/utils/auth";
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +42,7 @@ export default function App() {
   }
 
   function handleLogout() {
+    clearTokens();
     setSession(null);
   }
 

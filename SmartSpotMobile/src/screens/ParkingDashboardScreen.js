@@ -10,7 +10,7 @@
  * Drop-in replacement. All props unchanged.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Animated,
   Easing,
@@ -23,15 +23,16 @@ import {
 } from "react-native";
 
 import {
-  activityHistory,
-  entranceDisplay,
-  metrics,
-  notifications,
-  parkingData,
-  parkingGuidanceAreas,
+  activityHistory as fallbackHistory,
+  entranceDisplay as fallbackEntrance,
+  metrics as fallbackMetrics,
+  notifications as fallbackNotifications,
+  parkingData as fallbackParkingData,
+  parkingGuidanceAreas as fallbackGuidanceAreas,
   sensorStatus,
-  slotStatus,
+  slotStatus as fallbackSlots,
 } from "../data/parkingData";
+import { getAccessToken, API_BASE } from "../utils/auth";
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 
@@ -132,14 +133,14 @@ const rw = StyleSheet.create({
 });
 
 function FadeIn({ delay = 0, children }) {
-  const op = useRef(new Animated.Value(0)).current;
-  const ty = useRef(new Animated.Value(14)).current;
+  const [op] = useState(() => new Animated.Value(0));
+  const [ty] = useState(() => new Animated.Value(14));
   useEffect(() => {
     Animated.parallel([
       Animated.timing(op, { toValue: 1, duration: 340, delay, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(ty, { toValue: 0, duration: 340, delay, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
-  }, []);
+  }, [delay, op, ty]);
   return <Animated.View style={{ opacity: op, transform: [{ translateY: ty }] }}>{children}</Animated.View>;
 }
 
@@ -250,7 +251,7 @@ const tbar = StyleSheet.create({
 // ADMIN PAGES
 // ═══════════════════════════════════════════
 
-function AdminHome({ session, settings, onLogout, navigation, liveTime, occupancyRate }) {
+function AdminHome({ session, settings, onLogout, navigation, liveTime, occupancyRate, parkingData, metrics }) {
   const name = session?.profile?.fullName || "Admin";
   return (
     <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
@@ -333,7 +334,7 @@ function AdminHome({ session, settings, onLogout, navigation, liveTime, occupanc
   );
 }
 
-function AdminSlots() {
+function AdminSlots({ slotStatus }) {
   const [filter, setFilter] = useState("All");
   const filtered = filter === "All" ? slotStatus : slotStatus.filter((s) => s.status === filter);
   const avail = slotStatus.filter((s) => s.status === "Available").length;
@@ -422,7 +423,7 @@ function AdminSensors() {
   );
 }
 
-function AdminAlerts({ settings }) {
+function AdminAlerts({ settings, notifications, activityHistory }) {
   const [dismissedIds, setDismissedIds] = useState([]);
   const active = notifications.filter((n) => !dismissedIds.includes(n.id));
 
@@ -477,10 +478,13 @@ function AdminAlerts({ settings }) {
 // USER PAGES
 // ═══════════════════════════════════════════
 
-function UserHome({ session, onLogout, liveTime, occupancyRate }) {
+function UserHome({ session, onLogout, liveTime, occupancyRate, parkingData, entranceDisplay, parkingGuidanceAreas }) {
   const name = session?.profile?.fullName || "Guest User";
   const isGuest = session?.mode === "guest";
-  const rec = parkingGuidanceAreas.find((a) => a.availableSlots > 0) || parkingGuidanceAreas[0];
+  const rec =
+    parkingGuidanceAreas.find((a) => a.availableSlots > 0) ||
+    parkingGuidanceAreas[0] ||
+    { label: "Parking Area", availableSlots: 0 };
   const hint = parkingData.availableSlots >= 100 ? "Plenty of spots available now." : "Parking is getting tighter.";
 
   return (
@@ -545,7 +549,7 @@ function UserHome({ session, onLogout, liveTime, occupancyRate }) {
   );
 }
 
-function UserAreas({ occupancyRate }) {
+function UserAreas({ occupancyRate, parkingData, parkingGuidanceAreas }) {
   return (
     <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
       <FadeIn delay={0}>
@@ -584,8 +588,11 @@ function UserAreas({ occupancyRate }) {
   );
 }
 
-function UserGuidance() {
-  const rec = parkingGuidanceAreas.find((a) => a.availableSlots > 0) || parkingGuidanceAreas[0];
+function UserGuidance({ entranceDisplay, parkingGuidanceAreas }) {
+  const rec =
+    parkingGuidanceAreas.find((a) => a.availableSlots > 0) ||
+    parkingGuidanceAreas[0] ||
+    { id: "empty", label: "Parking Area", availableSlots: 0, status: "Full" };
   const sorted = [...parkingGuidanceAreas].sort((a, b) => b.availableSlots - a.availableSlots);
 
   return (
@@ -630,7 +637,7 @@ function UserGuidance() {
   );
 }
 
-function UserHistory() {
+function UserHistory({ activityHistory }) {
   return (
     <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
       <FadeIn delay={0}>
@@ -665,6 +672,93 @@ export default function ParkingDashboardScreen({ navigation, onLogout, session, 
   const isAdmin = session?.mode === "admin";
   const tabs = isAdmin ? ADMIN_TABS : USER_TABS;
   const [activeTab, setActiveTab] = useState("home");
+  const [parkingData, setParkingData] = useState(fallbackParkingData);
+  const [metrics, setMetrics] = useState(fallbackMetrics);
+  const [slotStatus, setSlotStatus] = useState(fallbackSlots);
+  const [notifications, setNotifications] = useState(fallbackNotifications);
+  const [activityHistory, setActivityHistory] = useState(fallbackHistory);
+  const [entranceDisplay, setEntranceDisplay] = useState(fallbackEntrance);
+  const [parkingGuidanceAreas, setParkingGuidanceAreas] = useState(fallbackGuidanceAreas);
+
+  useEffect(() => {
+    async function fetchDashboard() {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${API_BASE}/dashboard/summary/`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) return;
+
+        const d = json.data;
+
+        setParkingData(prev => ({
+          ...prev,
+          mallName: d.mall_name,
+          totalSlots: d.total_slots,
+          availableSlots: d.available_slots,
+          occupiedSlots: d.occupied_slots,
+        }));
+
+        setMetrics([
+          { id: "total", title: "Total Slots", value: d.total_slots, subtitle: "All levels" },
+          { id: "occupied", title: "Occupied", value: d.occupied_slots, subtitle: "Currently parked", status: "Occupied" },
+          { id: "available", title: "Available", value: d.available_slots, subtitle: "Open now", status: "Available" },
+          { id: "rate", title: "Occupancy", value: `${d.occupancy_rate}%`, subtitle: "Fill level" },
+        ]);
+
+        setSlotStatus(
+          d.areas.map(a => ({
+            slotId: a.name,
+            level: a.level,
+            status: a.available_slots > 0 ? "Available" : "Occupied",
+            plateNumber: `${a.available_slots}/${a.total_slots} free`,
+          }))
+        );
+
+        setParkingGuidanceAreas(
+          d.areas.map(a => ({
+            id: a.id,
+            label: a.name,
+            availableSlots: a.available_slots,
+            status: a.status === "open" ? "Open" : a.status === "limited" ? "Limited" : "Full",
+          }))
+        );
+
+        setEntranceDisplay({
+          primaryMessage: d.entrance_display?.primary_message || `${d.available_slots} SLOTS AVAILABLE`,
+          secondaryMessage: d.entrance_display?.secondary_message || "",
+        });
+
+        setActivityHistory(
+          d.recent_activity.map(a => ({
+            id: a.id,
+            time: a.created_time,
+            message: a.message,
+          }))
+        );
+
+        setNotifications(
+          d.recent_activity.map(a => ({
+            id: a.id,
+            message: a.message,
+            type: a.activity_type,
+          }))
+        );
+
+      } catch (e) {
+        console.log("API fetch error:", e);
+      }
+    }
+
+    fetchDashboard();
+    const interval = setInterval(
+      fetchDashboard,
+      Math.max(5, settings?.refreshInterval || 30) * 1000
+    );
+    return () => clearInterval(interval);
+  }, [settings?.refreshInterval]);
+  
   const [liveTime, setLiveTime] = useState(new Date());
 
   useEffect(() => {
@@ -679,15 +773,15 @@ export default function ParkingDashboardScreen({ navigation, onLogout, session, 
 
   function renderPage() {
     if (isAdmin) {
-      if (activeTab === "home") return <AdminHome key="ah" session={session} settings={settings} onLogout={onLogout} navigation={navigation} liveTime={liveTime} occupancyRate={occupancyRate} />;
-      if (activeTab === "slots") return <AdminSlots key="as" />;
+      if (activeTab === "home") return <AdminHome key="ah" session={session} settings={settings} onLogout={onLogout} navigation={navigation} liveTime={liveTime} occupancyRate={occupancyRate} parkingData={parkingData} metrics={metrics} />;
+      if (activeTab === "slots") return <AdminSlots key="as" slotStatus={slotStatus} />;
       if (activeTab === "sensors") return <AdminSensors key="ase" />;
-      if (activeTab === "alerts") return <AdminAlerts key="aal" settings={settings} />;
+      if (activeTab === "alerts") return <AdminAlerts key="aal" settings={settings} notifications={notifications} activityHistory={activityHistory} />;
     } else {
-      if (activeTab === "home") return <UserHome key="uh" session={session} onLogout={onLogout} liveTime={liveTime} occupancyRate={occupancyRate} />;
-      if (activeTab === "areas") return <UserAreas key="ua" occupancyRate={occupancyRate} />;
-      if (activeTab === "guidance") return <UserGuidance key="ug" />;
-      if (activeTab === "history") return <UserHistory key="uhi" />;
+      if (activeTab === "home") return <UserHome key="uh" session={session} onLogout={onLogout} liveTime={liveTime} occupancyRate={occupancyRate} parkingData={parkingData} entranceDisplay={entranceDisplay} parkingGuidanceAreas={parkingGuidanceAreas} />;
+      if (activeTab === "areas") return <UserAreas key="ua" occupancyRate={occupancyRate} parkingData={parkingData} parkingGuidanceAreas={parkingGuidanceAreas} />;
+      if (activeTab === "guidance") return <UserGuidance key="ug" entranceDisplay={entranceDisplay} parkingGuidanceAreas={parkingGuidanceAreas} />;
+      if (activeTab === "history") return <UserHistory key="uhi" activityHistory={activityHistory} />;
     }
   }
 

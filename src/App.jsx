@@ -6,7 +6,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { clearSession, createSession, getSession } from "./utils/auth";
 
 function App() {
-  const [session, setSession] = useState(() => {
+  const [session, setSession] = useState(() => {  
     try { return getSession(); } catch { return null; }
   });
 

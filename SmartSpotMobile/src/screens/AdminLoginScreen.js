@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { palette } from "../theme/palette";
+import { loginWithApi } from "../utils/auth";
 
 const demoAccess = {
   username: "admin@smartspot.local",
@@ -22,7 +23,7 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [attemptCount, setAttemptCount] = useState(0);
   const [lockedUntil, setLockedUntil] = useState(0);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   useEffect(() => {
     const timerId = setInterval(() => {
@@ -48,32 +49,32 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
     setLoading(true);
     setError("");
 
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    const result = await loginWithApi(form.username, form.password);
 
-    const valid =
-      form.username.trim().toLowerCase() === demoAccess.username &&
-      form.password === demoAccess.password;
+    setLoading(false);
 
-    if (!valid) {
+    if (!result.ok) {
+      if (result.reason === "network") {
+        setError("Cannot reach server. Is Django running?");
+        return;
+      }
       const nextAttempts = attemptCount + 1;
       setAttemptCount(nextAttempts);
-      setLoading(false);
-
       if (nextAttempts >= 5) {
         setAttemptCount(0);
         setLockedUntil(Date.now() + 60000);
         setError("Too many attempts. Account is temporarily locked.");
         return;
       }
-
       setError("Invalid admin credentials.");
       return;
     }
 
     setAttemptCount(0);
-    setLoading(false);
     onLoginSuccess("admin", {
-      fullName: "Parking Administrator",
+       fullName: result.user?.first_name
+        ? `${result.user.first_name} ${result.user.last_name}`.trim()
+        : result.user?.username || "Administrator",
       plateNumber: "Admin Access",
     });
   }

@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: ./SmartSpot-backend
+    container_name: smartspot-backend
+    environment:
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost,10.0.2.2,backend"
+      CORS_ALLOW_ALL_ORIGINS: "True"
+      DATABASE_NAME: "/data/db.sqlite3"
+    ports:
+      - "8000:8000"
+    volumes:
+      - smartspot_backend_data:/data
+
+  web:
+    build:
+      context: .
+    container_name: smartspot-web
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  smartspot_backend_data:
